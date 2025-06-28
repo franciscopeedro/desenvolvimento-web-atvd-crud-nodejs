@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lista de Alunos</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<h1>Lista de Alunos</h1>
+
+<table id="tabela">
+    <thead>
+        <tr>
+            <th>Nome</th>
+            <th>Curso</th>
+            <th>IRA</th>
+            <th>Ações</th>
+        </tr>
+    </thead>
+    <tbody>
+    </tbody>
+</table>
+
+<div class="media" id="media"></div>
+
+<h2 id="formTitulo">Criar Novo Aluno</h2>
+<form id="formAluno">
+    <input type="hidden" id="idAluno" />
+    <label>
+        Nome: <input type="text" id="nome" required />
+    </label><br />
+    <label>
+        Curso: <input type="text" id="curso" required />
+    </label><br />
+    <label>
+        IRA: <input type="number" id="ira" step="0.1" min="0" max="10" required />
+    </label><br />
+    <button type="submit">Salvar</button>
+    <button type="button" id="cancelarEdicao" style="display:none;">Cancelar</button>
+</form>
+
+<script>
+const url = 'http://localhost:3000/alunos';
+
+const tabelaBody = document.querySelector('#tabela tbody');
+const mediaDiv = document.getElementById('media');
+const form = document.getElementById('formAluno');
+const formTitulo = document.getElementById('formTitulo');
+const cancelarBtn = document.getElementById('cancelarEdicao');
+
+const idInput = document.getElementById('idAluno');
+const nomeInput = document.getElementById('nome');
+const cursoInput = document.getElementById('curso');
+const iraInput = document.getElementById('ira');
+
+let alunos = [];
+
+// Função para carregar alunos e atualizar a tabela
+function carregarAlunos() {
+    fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            alunos = data;
+            atualizarTabela();
+        })
+        .catch(err => {
+            console.error('Erro ao buscar alunos:', err);
+        });
+}
+
+// Atualiza a tabela e a média
+function atualizarTabela() {
+    tabelaBody.innerHTML = '';
+    let somaIRA = 0;
+
+    alunos.forEach(aluno => {
+        const linha = document.createElement('tr');
+
+        linha.innerHTML = `
+            <td>${aluno.nome}</td>
+            <td>${aluno.curso}</td>
+            <td>${aluno.ira}</td>
+            <td>
+                <button onclick="editarAluno(${aluno.id})">Editar</button>
+                <button onclick="apagarAluno(${aluno.id})">Apagar</button>
+            </td>
+        `;
+
+        tabelaBody.appendChild(linha);
+        somaIRA += aluno.ira;
+    });
+
+    const mediaIRA = alunos.length ? (somaIRA / alunos.length).toFixed(2) : 0;
+    mediaDiv.innerText = `Média dos IRAs: ${mediaIRA}`;
+}
+
+// Função para criar ou atualizar aluno
+form.addEventListener('submit', e => {
+    e.preventDefault();
+
+    const id = idInput.value;
+    const nome = nomeInput.value.trim();
+    const curso = cursoInput.value.trim();
+    const ira = parseFloat(iraInput.value);
+
+    if (!nome || !curso || isNaN(ira)) {
+        alert('Preencha todos os campos corretamente.');
+        return;
+    }
+
+    const alunoData = { nome, curso, ira };
+
+    if (id) {
+        // Atualizar
+        fetch(`${url}/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(alunoData)
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Erro ao atualizar aluno');
+            return res.json();
+        })
+        .then(() => {
+            resetForm();
+            carregarAlunos();
+        })
+        .catch(err => alert(err.message));
+    } else {
+        // Criar
+        fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(alunoData)
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Erro ao criar aluno');
+            return res.json();
+        })
+        .then(() => {
+            resetForm();
+            carregarAlunos();
+        })
+        .catch(err => alert(err.message));
+    }
+});
+
+// Função para preencher formulário para edição
+function editarAluno(id) {
+    const aluno = alunos.find(a => a.id === id);
+    if (!aluno) return alert('Aluno não encontrado');
+
+    idInput.value = aluno.id;
+    nomeInput.value = aluno.nome;
+    cursoInput.value = aluno.curso;
+    iraInput.value = aluno.ira;
+
+    formTitulo.innerText = 'Editar Aluno';
+    cancelarBtn.style.display = 'inline';
+}
+
+// Cancelar edição
+cancelarBtn.addEventListener('click', () => {
+    resetForm();
+});
+
+// Resetar formulário para modo criar
+function resetForm() {
+    idInput.value = '';
+    nomeInput.value = '';
+    cursoInput.value = '';
+    iraInput.value = '';
+
+    formTitulo.innerText = 'Criar Novo Aluno';
+    cancelarBtn.style.display = 'none';
+}
+
+window.apagarAluno = function(id) {
+    if (!confirm('Confirma a exclusão do aluno?')) return;
+
+    fetch(`${url}/${id}`, {
+        method: 'DELETE'
+    })
+    .then(res => {
+        if (!res.ok) throw new Error('Erro ao apagar aluno');
+        return res.json();
+    })
+    .then(() => {
+        carregarAlunos();
+    })
+    .catch(err => alert(err.message));
+};
+
+// Carregar lista ao iniciar
+carregarAlunos();
+
+</script>
+
+</body>
+</html>
